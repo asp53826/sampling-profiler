@@ -20,9 +20,16 @@ doing `n_i` units holds share `n_i / Σn`. Linearity is measured, not assumed:
 
 ```
 burn() cost per unit    32.38 µs
-linearity R²            0.999961
-worst rel. residual     0.0193
+linearity R²            0.999982
+worst rel. residual     0.0204
 ```
+
+Calibration quality is a property of the machine, not a constant. On a
+contended CI runner an earlier version reported R² 0.9955 with a 31% worst
+residual against 0.9999 and 2% on an idle laptop — the fit was fine, the
+estimator was not. Timing noise is one-sided, so `calibrate` takes the minimum
+over many repeats and `calibrate().ok()` reports whether this host can support
+the ground truth at all rather than reporting shares regardless.
 
 Shares are then established two independent ways — by construction and by
 directly timing each function in isolation — and the benchmark reports their

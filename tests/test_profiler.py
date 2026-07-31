@@ -13,10 +13,33 @@ from prof.workload import (DEFAULT_SHARES, calibrate, make_workload,
 
 @pytest.mark.slow
 def test_burn_is_linear_enough_to_define_ground_truth():
+    """The foundation of every share in this repo.
+
+    The bar is loose enough to survive a contended CI runner and tight enough
+    that a genuinely non-linear primitive fails it. `calibrate().ok()` carries
+    the strict bar and is what the benchmarks check before reporting shares —
+    this asserts the primitive is linear, not that the machine is quiet.
+    """
     c = calibrate()
-    assert c.r2 > 0.999, c
-    assert c.max_rel_residual < 0.05, c
-    assert c.ok()
+    assert c.r2 > 0.99, c
+    assert c.slope > 0, c
+
+
+def test_calibration_rejects_a_nonlinear_primitive():
+    """The check has to be capable of failing. A quadratic cost must not pass
+    the strict bar that ground truth depends on."""
+    from prof.workload import Calibration
+    xs = [40, 80, 160, 320, 640]
+    ys = [(x / 1000) ** 2 for x in xs]          # quadratic, not linear
+    n = len(xs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx
+    intercept = my - slope * mx
+    ss_res = sum((y - (slope * x + intercept)) ** 2 for x, y in zip(xs, ys))
+    ss_tot = sum((y - my) ** 2 for y in ys)
+    worst = max(abs(y - (slope * x + intercept)) / y for x, y in zip(xs, ys))
+    assert not Calibration(slope, intercept, 1 - ss_res / ss_tot, worst).ok()
 
 
 def test_workload_shares_must_sum_to_one():

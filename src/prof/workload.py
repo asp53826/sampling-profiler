@@ -47,14 +47,27 @@ class Calibration:
     max_rel_residual: float
 
     def ok(self, tol: float = 0.05) -> bool:
+        """Whether this machine can support the benchmark's ground truth.
+
+        Deliberately a property of the measurement, not a constant: on hardware
+        too noisy to calibrate, the shares below are unreliable and the honest
+        answer is to say so rather than report them anyway.
+        """
         return self.r2 > 0.999 and self.max_rel_residual < tol
 
 
-def calibrate(units=(20, 40, 80, 160, 320), repeats: int = 3) -> Calibration:
+def calibrate(units=(40, 80, 160, 320, 640), repeats: int = 9) -> Calibration:
     """Least-squares fit of runtime against units, with the worst residual.
 
     If this is not linear, every 'true share' below is wrong and the whole
     benchmark is measuring nothing.
+
+    `min` over many repeats rather than a mean: timing noise on a shared machine
+    is one-sided — contention only ever makes a measurement slower — so the
+    minimum is the robust estimator and more repeats strictly improve it. An
+    earlier version used 3 repeats and the smallest unit, and on a contended CI
+    runner that reported R² 0.9955 with a 31% worst residual against 0.9999 and
+    1.9% on an idle laptop. The fit was fine; the estimator was not.
     """
     xs, ys = [], []
     for u in units:
