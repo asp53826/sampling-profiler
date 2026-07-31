@@ -1,0 +1,32 @@
+
+=== blind spot 1: time inside a single C call is unattributable ===
+
+  measured directly:  python 30 ms   C call 58 ms
+  true C share:       66.3%
+
+  frame                   samples    share
+  ----------------------------------------
+  pure_python                  91   82.0%
+  uninterruptible              12   10.8%
+  mixed                         6    5.4%
+  _handler                      2    1.8%
+
+  profiler attributes 10.8% to the C-heavy function against a
+  true 66.3%. The handler cannot run during `list.sort`, so the
+  samples land on whichever Python frame resumes afterwards. This is
+  not a tuning problem: it is what in-process signal sampling can see.
+  Production Python profilers read the target from another process
+  precisely to avoid it.
+
+=== blind spot 2: only the main thread exists ===
+
+  a worker thread ran the whole time; samples attributed to it: 0.0%
+  frame                   samples    share
+  ----------------------------------------
+  main_thread_work             76   97.4%
+  wait                          1    1.3%
+  join                          1    1.3%
+
+  CPython delivers signals only to the main thread, so a worker doing
+  half the work is invisible. The profile is not wrong about the main
+  thread — it is silent about everything else, which reads the same.

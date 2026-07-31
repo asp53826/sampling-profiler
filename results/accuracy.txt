@@ -1,0 +1,60 @@
+
+   requested  achieved   ratio  samples  overhead
+  -----------------------------------------------
+         100        91    0.91       53      1.2%
+         250       127    0.51       74      0.6%
+         500       182    0.36      108      2.6%
+        1000       281    0.28      169      4.1%
+        2000       257    0.13      153      3.2%
+        5000       283    0.06      166      1.7%
+
+  ITIMER_PROF fires on consumed CPU time, but CPython only runs the
+  handler at a bytecode boundary and the OS timer has its own
+  granularity. Asking for more than the platform delivers costs
+  overhead without buying samples — which is why the ratio column
+  matters more than the requested rate.
+
+=== attribution error shrinks as 1/sqrt(samples) ===
+
+   rounds  samples  mean |err|  max |err|  predicted se
+  -----------------------------------------------------
+        4      157      0.0150     0.0279        0.0235
+        8      182      0.0134     0.0319        0.0219
+       16      613      0.0140     0.0470        0.0119
+       32      978      0.0126     0.0250        0.0094
+       64     1513      0.0150     0.0328        0.0076
+
+  Mean error tracks the binomial standard error, which is the whole
+  behaviour of a sampling profiler: it is an estimator, and its noise
+  is predictable rather than mysterious.
+
+=== the floor: when is a hot path distinguishable from nothing? ===
+
+  A function holding share p is 'detected' when its measured share is
+  more than two standard errors above zero — the usual bar for saying
+  a count is not noise. Solving 2·sqrt(p(1-p)/n) < p gives n > 4(1-p)/p.
+
+   true share  samples needed  seconds @272Hz
+  -------------------------------------------
+       40.0%               6            0.0s
+       10.0%              36            0.1s
+        5.0%              76            0.3s
+        3.0%             130            0.5s
+        2.0%             196            0.7s
+        1.0%             396            1.5s
+        0.5%             796            2.9s
+        0.1%           3,996           14.7s
+
+  Verified empirically below: each function is called until it either
+  clears the bar or the budget runs out.
+
+  1835 samples collected
+  function       true  measured      se    2·se  detected
+  -------------------------------------------------------
+  hot_40       0.4165    0.3935  0.0114  0.0228       yes
+  warm_25      0.2387    0.2480  0.0101  0.0202       yes
+  mid_15       0.1743    0.1548  0.0084  0.0169       yes
+  mid_10       0.0872    0.1003  0.0070  0.0140       yes
+  cool_05      0.0416    0.0485  0.0050  0.0100       yes
+  faint_03     0.0250    0.0338  0.0042  0.0084       yes
+  trace_02     0.0167    0.0207  0.0033  0.0066       yes
